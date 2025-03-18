@@ -71,6 +71,7 @@
     { MP_ROM_QSTR(MP_QSTR_WDT_RESET), MP_ROM_INT(MP_WDT_RESET) }, \
     { MP_ROM_QSTR(MP_QSTR_DEEPSLEEP_RESET), MP_ROM_INT(MP_DEEPSLEEP_RESET) }, \
     { MP_ROM_QSTR(MP_QSTR_SOFT_RESET), MP_ROM_INT(MP_SOFT_RESET) }, \
+    { MP_ROM_QSTR(MP_QSTR_BROWNOUT_RESET), MP_ROM_INT(MP_BROWNOUT_RESET) }, \
     \
     /* Wake reasons */ \
     { MP_ROM_QSTR(MP_QSTR_wake_reason), MP_ROM_PTR(&machine_wake_reason_obj) }, \
@@ -86,7 +87,8 @@ typedef enum {
     MP_HARD_RESET,
     MP_WDT_RESET,
     MP_DEEPSLEEP_RESET,
-    MP_SOFT_RESET
+    MP_SOFT_RESET,
+    MP_BROWNOUT_RESET,
 } reset_reason_t;
 
 static bool is_soft_reset = 0;
@@ -211,8 +213,9 @@ static mp_int_t mp_machine_reset_cause(void) {
     }
     switch (esp_reset_reason()) {
         case ESP_RST_POWERON:
-        case ESP_RST_BROWNOUT:
             return MP_PWRON_RESET;
+        case ESP_RST_BROWNOUT:
+            return MP_BROWNOUT_RESET;
 
         case ESP_RST_INT_WDT:
         case ESP_RST_TASK_WDT:
@@ -230,7 +233,7 @@ static mp_int_t mp_machine_reset_cause(void) {
         case ESP_RST_SDIO:
         case ESP_RST_UNKNOWN:
         default:
-            return 0;
+            return esp_reset_reason()+0x100;
     }
 }
 
