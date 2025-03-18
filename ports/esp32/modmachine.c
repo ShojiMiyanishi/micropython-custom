@@ -86,7 +86,7 @@ typedef enum {
     MP_HARD_RESET,
     MP_WDT_RESET,
     MP_DEEPSLEEP_RESET,
-    MP_SOFT_RESET
+    MP_SOFT_RESET,
 } reset_reason_t;
 
 static bool is_soft_reset = 0;
@@ -200,6 +200,8 @@ static void machine_sleep_helper(wake_type_t wake_type, size_t n_args, const mp_
             esp_light_sleep_start();
             break;
         case MACHINE_WAKE_DEEPSLEEP:
+        #include "esp_task_wdt.h"
+            esp_task_wdt_deinit();
             esp_deep_sleep_start();
             break;
     }
@@ -218,9 +220,9 @@ static mp_int_t mp_machine_reset_cause(void) {
     if (is_soft_reset) {
         return MP_SOFT_RESET;
     }
+    #if 1
     switch (esp_reset_reason()) {
         case ESP_RST_POWERON:
-        case ESP_RST_BROWNOUT:
             return MP_PWRON_RESET;
 
         case ESP_RST_INT_WDT:
@@ -232,15 +234,21 @@ static mp_int_t mp_machine_reset_cause(void) {
             return MP_DEEPSLEEP_RESET;
 
         case ESP_RST_SW:
-        case ESP_RST_PANIC:
+            return MP_SOFT_RESET;
+            
+        case ESP_RST_BROWNOUT:
+            //return MP_BROWNOUT_RESET;
         case ESP_RST_EXT: // Comment in ESP-IDF: "For ESP32, ESP_RST_EXT is never returned"
-            return MP_HARD_RESET;
-
+            //    return MP_HARD_RESET;
+        case ESP_RST_PANIC:
         case ESP_RST_SDIO:
         case ESP_RST_UNKNOWN:
         default:
-            return 0;
+            return esp_reset_reason()+0x100;
     }
+    #else
+    return esp_reset_reason();
+    #endif
 }
 
 #if MICROPY_ESP32_USE_BOOTLOADER_RTC

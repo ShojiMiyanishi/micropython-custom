@@ -120,6 +120,7 @@ list(APPEND MICROPY_SOURCE_PORT
     machine_rtc.c
     machine_sdcard.c
     modespnow.c
+    #modlcd8080.c
 )
 list(TRANSFORM MICROPY_SOURCE_PORT PREPEND ${MICROPY_PORT_DIR}/)
 list(APPEND MICROPY_SOURCE_PORT ${CMAKE_BINARY_DIR}/pins.c)
@@ -155,6 +156,7 @@ list(APPEND IDF_COMPONENTS
     esp_system
     esp_timer
     esp_wifi
+    esp_lcd
     freertos
     hal
     heap
