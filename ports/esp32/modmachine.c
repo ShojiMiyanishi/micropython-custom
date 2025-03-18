@@ -71,6 +71,7 @@
     { MP_ROM_QSTR(MP_QSTR_WDT_RESET), MP_ROM_INT(MP_WDT_RESET) }, \
     { MP_ROM_QSTR(MP_QSTR_DEEPSLEEP_RESET), MP_ROM_INT(MP_DEEPSLEEP_RESET) }, \
     { MP_ROM_QSTR(MP_QSTR_SOFT_RESET), MP_ROM_INT(MP_SOFT_RESET) }, \
+    { MP_ROM_QSTR(MP_QSTR_BROWNOUT_RESET), MP_ROM_INT(MP_BROWNOUT_RESET) }, \
     \
     /* Wake reasons */ \
     { MP_ROM_QSTR(MP_QSTR_wake_reason), MP_ROM_PTR(&machine_wake_reason_obj) }, \
@@ -87,6 +88,7 @@ typedef enum {
     MP_WDT_RESET,
     MP_DEEPSLEEP_RESET,
     MP_SOFT_RESET,
+    MP_BROWNOUT_RESET,
 } reset_reason_t;
 
 static bool is_soft_reset = 0;
@@ -220,7 +222,6 @@ static mp_int_t mp_machine_reset_cause(void) {
     if (is_soft_reset) {
         return MP_SOFT_RESET;
     }
-    #if 1
     switch (esp_reset_reason()) {
         case ESP_RST_POWERON:
             return MP_PWRON_RESET;
@@ -234,21 +235,18 @@ static mp_int_t mp_machine_reset_cause(void) {
             return MP_DEEPSLEEP_RESET;
 
         case ESP_RST_SW:
-            return MP_SOFT_RESET;
+        case ESP_RST_PANIC:
+        case ESP_RST_EXT: // Comment in ESP-IDF: "For ESP32, ESP_RST_EXT is never returned"
+            return MP_HARD_RESET;
             
         case ESP_RST_BROWNOUT:
-            //return MP_BROWNOUT_RESET;
-        case ESP_RST_EXT: // Comment in ESP-IDF: "For ESP32, ESP_RST_EXT is never returned"
-            //    return MP_HARD_RESET;
-        case ESP_RST_PANIC:
+            return MP_BROWNOUT_RESET;
+
         case ESP_RST_SDIO:
         case ESP_RST_UNKNOWN:
         default:
             return esp_reset_reason()+0x100;
     }
-    #else
-    return esp_reset_reason();
-    #endif
 }
 
 #if MICROPY_ESP32_USE_BOOTLOADER_RTC
