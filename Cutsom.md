@@ -10,4 +10,8 @@ def enter_deepsleep():
     wake_on_gpio([a,b],esp32.WAKEUP_GPIO_LOW);
     wake_on_gpio([c],esp32.WAKEUP_GPIO_HIGH);
     deepsleep()
-```   
+```
+### ESP32のreset_reasonを改変
+* MPに未定義な理由によるreset原因の場合ESP32の原因コードに0x100をプラスして出力。
+* Brownoutを分離し、原因の区別ができるように変更。
+* ESP32のreset原因コードが統一されているかわからないので、IC毎にデコードする必要があるかもしれない。
