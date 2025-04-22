@@ -16,8 +16,10 @@ endif()
 
 # RISC-V specific inclusions
 if(CONFIG_IDF_TARGET_ARCH_RISCV)
-    list(APPEND MICROPY_SOURCE_LIB ${MICROPY_DIR}/shared/runtime/gchelper_generic.c)
-    list(APPEND IDF_COMPONENTS riscv)
+    list(APPEND MICROPY_SOURCE_LIB
+        ${MICROPY_DIR}/shared/runtime/gchelper_native.c
+        ${MICROPY_DIR}/shared/runtime/gchelper_rv32i.s
+    )
 endif()
 
 if(NOT DEFINED MICROPY_PY_TINYUSB)
@@ -71,8 +73,8 @@ list(APPEND MICROPY_SOURCE_DRIVERS
     ${MICROPY_DIR}/drivers/dht/dht.c
 )
 
-string(CONCAT GIT_SUBMODULES "${GIT_SUBMODULES} " lib/tinyusb)
-if(MICROPY_PY_TINYUSB AND NOT ECHO_SUBMODULES)
+list(APPEND GIT_SUBMODULES lib/tinyusb)
+if(MICROPY_PY_TINYUSB)
     set(TINYUSB_SRC "${MICROPY_DIR}/lib/tinyusb/src")
     string(TOUPPER OPT_MCU_${IDF_TARGET} tusb_mcu)
 
@@ -195,6 +197,17 @@ if (MICROPY_USER_LDFRAGMENTS)
     set(MICROPY_LDFRAGMENTS ${MICROPY_USER_LDFRAGMENTS})
 endif()
 
+if (UPDATE_SUBMODULES)
+    # ESP-IDF checks if some paths exist before CMake does. Some paths don't
+    # yet exist if this is an UPDATE_SUBMODULES pass on a brand new checkout, so remove
+    # any path which might not exist yet. A "real" build will not set UPDATE_SUBMODULES.
+    unset(MICROPY_SOURCE_TINYUSB)
+    unset(MICROPY_SOURCE_EXTMOD)
+    unset(MICROPY_SOURCE_LIB)
+    unset(MICROPY_INC_TINYUSB)
+    unset(MICROPY_INC_CORE)
+endif()
+
 # Register the main IDF component.
 idf_component_register(
     SRCS
@@ -223,8 +236,10 @@ idf_component_register(
 set(MICROPY_TARGET ${COMPONENT_TARGET})
 
 # Define mpy-cross flags, for use with frozen code.
-if(CONFIG_IDF_TARGET_ARCH STREQUAL "xtensa")
-set(MICROPY_CROSS_FLAGS -march=xtensawin)
+if(CONFIG_IDF_TARGET_ARCH_XTENSA)
+    set(MICROPY_CROSS_FLAGS -march=xtensawin)
+elseif(CONFIG_IDF_TARGET_ARCH_RISCV)
+    set(MICROPY_CROSS_FLAGS -march=rv32imc)
 endif()
 
 # Set compile options for this port.
@@ -232,7 +247,6 @@ target_compile_definitions(${MICROPY_TARGET} PUBLIC
     ${MICROPY_DEF_CORE}
     ${MICROPY_DEF_BOARD}
     ${MICROPY_DEF_TINYUSB}
-    MICROPY_ESP_IDF_4=1
     MICROPY_VFS_FAT=1
     MICROPY_VFS_LFS2=1
     FFCONF_H=\"${MICROPY_OOFATFS_DIR}/ffconf.h\"
