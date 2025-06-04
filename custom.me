@@ -9,3 +9,4 @@ ESP32-C3,C6のDeepsleepからの復帰にGPIOを利用できるように改変
         wake_on_gpio([c],esp32.WAKEUP_GPIO_HIGH);
 ESP32, UARTをRS485モードに設定できるように改変
   RTSのポートをRXのゲートに指定する必要あり
+  UARTに与えるRTSはPin.OUTオブジェクト。出力で初期化して渡す。
