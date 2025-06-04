@@ -522,6 +522,7 @@ target_link_options(${MICROPY_TARGET} PRIVATE
 if(PICO_RP2350)
     target_link_options(${MICROPY_TARGET} PRIVATE
         -Wl,--defsym=__micropy_extra_stack__=4096
+	LINKER:-Map=foo.map
     )
 endif()
 

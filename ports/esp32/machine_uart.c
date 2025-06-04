@@ -59,6 +59,11 @@
 #define UART_IRQ_BREAK (1 << UART_BREAK)
 #define MP_UART_ALLOWED_FLAGS (UART_IRQ_RX | UART_IRQ_RXIDLE | UART_IRQ_BREAK)
 #define RXIDLE_TIMER_MIN (5000)  // 500 us
+/*
+UART_MODE_RS485_HALF_DUPLEX
+rtsピンはTX送信時Hi
+*/
+#define RS485
 
 enum {
     RXIDLE_INACTIVE,
@@ -91,6 +96,9 @@ typedef struct _machine_uart_obj_t {
     machine_timer_obj_t *rxidle_timer;
     uint8_t rxidle_state;
     uint16_t rxidle_period;
+    #ifdef RS485
+    uart_mode_t mode;
+    #endif
 } machine_uart_obj_t;
 
 static const char *_parity_name[] = {"None", "1", "0"};
@@ -178,9 +186,17 @@ static void mp_machine_uart_print(const mp_print_t *print, mp_obj_t self_in, mp_
     machine_uart_obj_t *self = MP_OBJ_TO_PTR(self_in);
     uint32_t baudrate;
     check_esp_err(uart_get_baudrate(self->uart_num, &baudrate));
+    #ifdef RS485
+    mp_printf(print, "UART(%u, baudrate=%u, bits=%u, parity=%s, stop=%u, tx=%d, rx=%d, rts=%d, cts=%d, txbuf=%u, rxbuf=%u, timeout=%u, timeout_char=%u, irq=%d , mode=%d",
+        self->uart_num, baudrate, self->bits, _parity_name[self->parity],
+        self->stop, self->tx, self->rx, self->rts, self->cts, self->txbuf, self->rxbuf, self->timeout, self->timeout_char, self->mp_irq_trigger,
+        self->mode);
+    #else
     mp_printf(print, "UART(%u, baudrate=%u, bits=%u, parity=%s, stop=%u, tx=%d, rx=%d, rts=%d, cts=%d, txbuf=%u, rxbuf=%u, timeout=%u, timeout_char=%u, irq=%d",
         self->uart_num, baudrate, self->bits, _parity_name[self->parity],
-        self->stop, self->tx, self->rx, self->rts, self->cts, self->txbuf, self->rxbuf, self->timeout, self->timeout_char, self->mp_irq_trigger);
+        self->stop, self->tx, self->rx, self->rts, self->cts, self->txbuf, self->rxbuf, self->timeout, self->timeout_char, self->mp_irq_trigger
+        );
+    #endif
     if (self->invert) {
         mp_printf(print, ", invert=");
         uint32_t invert_mask = self->invert;
@@ -227,7 +243,7 @@ static void mp_machine_uart_print(const mp_print_t *print, mp_obj_t self_in, mp_
 }
 
 static void mp_machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    enum { ARG_baudrate, ARG_bits, ARG_parity, ARG_stop, ARG_tx, ARG_rx, ARG_rts, ARG_cts, ARG_txbuf, ARG_rxbuf, ARG_timeout, ARG_timeout_char, ARG_invert, ARG_flow };
+    enum { ARG_baudrate, ARG_bits, ARG_parity, ARG_stop, ARG_tx, ARG_rx, ARG_rts, ARG_cts, ARG_txbuf, ARG_rxbuf, ARG_timeout, ARG_timeout_char, ARG_invert, ARG_flow ,ARG_mode};
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_baudrate, MP_ARG_INT, {.u_int = 0} },
         { MP_QSTR_bits, MP_ARG_INT, {.u_int = 0} },
@@ -243,13 +259,28 @@ static void mp_machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args,
         { MP_QSTR_timeout_char, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
         { MP_QSTR_invert, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
         { MP_QSTR_flow, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
+        { MP_QSTR_mode, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
     };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
     // wait for all data to be transmitted before changing settings
     uart_wait_tx_done(self->uart_num, pdMS_TO_TICKS(1000));
-
+    #ifdef RS485
+        if (args[ARG_mode].u_int >=0 )
+        {
+            self->mode= args[ARG_mode].u_int;
+            printf("UART mode:%d\n\r",self->mode);
+            if (args[ARG_rts].u_obj==MP_OBJ_NULL){
+                printf("But UART rts not defined\n\r");
+            }else{
+                if (self->mode==1){
+                    printf("set mode UART_MODE_RS485_HALF_DUPLEX ,RTS: %d\n\r",self->rts);
+                    check_esp_err(uart_set_mode(self->uart_num,self->mode));
+                }
+            }
+        }
+    #endif
     if (args[ARG_txbuf].u_int >= 0 || args[ARG_rxbuf].u_int >= 0) {
         // must reinitialise driver to change the tx/rx buffer size
         #if MICROPY_HW_ENABLE_UART_REPL
