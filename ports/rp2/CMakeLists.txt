@@ -66,6 +66,11 @@ if(NOT MICROPY_C_HEAP_SIZE)
     set(MICROPY_C_HEAP_SIZE 0)
 endif()
 
+# Enable error text compression by default.
+if(NOT MICROPY_ROM_TEXT_COMPRESSION)
+    set(MICROPY_ROM_TEXT_COMPRESSION ON)
+endif()
+
 # Enable extmod components that will be configured by extmod.cmake.
 # A board may also have enabled additional components.
 set(MICROPY_SSL_MBEDTLS ON)
@@ -78,6 +83,9 @@ endif()
 # Necessary submodules for all boards.
 list(APPEND GIT_SUBMODULES lib/mbedtls)
 list(APPEND GIT_SUBMODULES lib/tinyusb)
+
+# Workaround for pico-sdk host toolchain issue, see directory for details
+list(APPEND CMAKE_MODULE_PATH "${MICROPY_PORT_DIR}/tools_patch")
 
 # Include component cmake fragments
 include(${MICROPY_DIR}/py/py.cmake)
@@ -426,7 +434,7 @@ if (MICROPY_PY_NETWORK_NINAW10)
 
     # Enable NINA-W10 WiFi and Bluetooth drivers.
     list(APPEND MICROPY_SOURCE_DRIVERS
-        ${MICROPY_DIR}/drivers/ninaw10/nina_bt_hci.c
+        ${MICROPY_DIR}/drivers/ninaw10/nina_bthci_uart.c
         ${MICROPY_DIR}/drivers/ninaw10/nina_wifi_drv.c
         ${MICROPY_DIR}/drivers/ninaw10/nina_wifi_bsp.c
         ${MICROPY_DIR}/drivers/ninaw10/machine_pin_nina.c
@@ -517,9 +525,22 @@ target_compile_options(${MICROPY_TARGET} PRIVATE
 
 target_link_options(${MICROPY_TARGET} PRIVATE
     -Wl,--defsym=__micropy_c_heap_size__=${MICROPY_C_HEAP_SIZE}
-    -Wl,--wrap=dcd_event_handler
     -Wl,--wrap=runtime_init_clocks
 )
+
+if(PICO_FLASH_SIZE_BYTES GREATER 0)
+    target_link_options(${MICROPY_TARGET} PRIVATE
+        -Wl,--defsym=__micropy_flash_size__=${PICO_FLASH_SIZE_BYTES}
+    )
+elseif(PICO_RP2040)
+    target_link_options(${MICROPY_TARGET} PRIVATE
+        -Wl,--defsym=__micropy_flash_size__=2048k # Default to 2MB
+    )
+elseif(PICO_RP2350)
+    target_link_options(${MICROPY_TARGET} PRIVATE
+        -Wl,--defsym=__micropy_flash_size__=4096k # Default to 4MB
+    )
+endif()
 
 if(PICO_RP2350)
     target_link_options(${MICROPY_TARGET} PRIVATE
